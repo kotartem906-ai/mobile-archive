@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Нотатки</title>
+  <meta name="theme-color" content="#0f0f13">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Нотатки">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon192.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1 id="appTitle">Нотатки <span id="storageInfo" class="storage-info" title="Використано сховища"></span></h1>
+                  <div class="header-actions">
+        <div class="menu-wrap menu-wrap-settings">
+          <button id="btnSettings" class="icon-btn" title="Налаштування" type="button">⚙</button>
+          <div id="settingsMenu" class="settings-panel hidden">
+            <div class="settings-section">
+              <div class="settings-title">Сортування</div>
+              <button type="button" class="dropdown-item" data-sort="manual">Як розставив</button>
+              <button type="button" class="dropdown-item" data-sort="rating_desc">★ вищі спочатку</button>
+              <button type="button" class="dropdown-item" data-sort="rating_asc">★ нижчі спочатку</button>
+              <button type="button" class="dropdown-item" data-sort="desire_desc">🔥 сильніше спочатку</button>
+              <button type="button" class="dropdown-item" data-sort="name_asc">А → Я</button>
+              <button type="button" class="dropdown-item" data-sort="name_desc">Я → А</button>
+              <button type="button" class="dropdown-item" data-sort="newest">Нові зверху</button>
+              <button type="button" class="dropdown-item" data-sort="oldest">Нові внизу</button>
+            </div>
+            <div class="settings-section">
+              <div class="settings-title">Назва на екрані (маскування)</div>
+              <div style="padding:6px 10px 10px;">
+                <input type="text" id="coverTitleInput" placeholder="Нотатки / Щоденник / Тренування..." style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);">
+                <button type="button" id="btnSaveCover" class="btn-secondary" style="margin-top:8px;width:100%;">Зберегти назву</button>
+              </div>
+            </div>
+            <div class="settings-section">
+              <div class="settings-title">Тема</div>
+              <button type="button" class="dropdown-item theme-pick" data-theme="blood">Кров</button>
+              <button type="button" class="dropdown-item theme-pick" data-theme="latex">Мокрий латекс</button>
+              <button type="button" class="dropdown-item theme-pick" data-theme="neon">Неон-шлюха</button>
+              <button type="button" class="dropdown-item theme-pick" data-theme="wine">Вино на шкірі</button>
+              <button type="button" class="dropdown-item theme-pick" data-theme="heat">Спека в паху</button>
+              <button type="button" class="dropdown-item theme-pick" data-theme="velvet">Оксамитове ліжко</button>
+              <button type="button" class="dropdown-item theme-pick" data-theme="pulse">Пульс</button>
+              <button type="button" class="dropdown-item theme-pick" data-theme="glow">Розпечене тіло</button>
+            </div>
+          </div>
+        </div>
+        <button id="btnSearch" class="icon-btn" title="Пошук" type="button">🔍</button>
+        <button id="btnExport" class="icon-btn" title="Експорт" type="button">⬇️</button>
+        <button id="btnImport" class="icon-btn" title="Імпорт" type="button">⬆️</button>
+        
+      </div>
+    </header>
+
+<div id="searchBar" class="search-bar hidden">
+      <input type="text" id="searchInput" placeholder="Пошук по імені, нотатках...">
+    </div>
+
+    <!-- SECTION: PORN MODELS -->
+    <section class="section collapsed" id="section-models">
+      <div class="section-header" data-section="models">
+        <span class="section-toggle">▼</span>
+        <h2>🔥 Порно моделі</h2>
+        <span class="count" id="modelsCount">0</span>
+        <button class="btn-add" data-type="models" title="Додати модель">+</button>
+      </div>
+      <div class="section-content" id="modelsContent">
+        <div class="cards-grid" id="modelsGrid"></div>
+        <div class="empty-state" id="modelsEmpty">Порожньо. Додай першу.</div>
+      </div>
+    </section>
+
+
+    <!-- SECTION: ONLYFANS -->
+    <section class="section collapsed" id="section-onlyfans">
+      <div class="section-header" data-section="onlyfans">
+        <span class="section-toggle">▼</span>
+        <h2>💜 OnlyFans моделі</h2>
+        <span class="count" id="onlyfansCount">0</span>
+        <button class="btn-add" data-type="onlyfans" title="Додати OnlyFans модель">+</button>
+      </div>
+      <div class="section-content" id="onlyfansContent">
+        <div class="cards-grid" id="onlyfansGrid"></div>
+        <div class="empty-state" id="onlyfansEmpty">Порожньо. Додай першу.</div>
+      </div>
+    </section>
+
+    <!-- SECTION: WEBCAM -->
+    <section class="section collapsed" id="section-webcam">
+      <div class="section-header" data-section="webcam">
+        <span class="section-toggle">▼</span>
+        <h2>🎥 Webcam моделі</h2>
+        <span class="count" id="webcamCount">0</span>
+        <button class="btn-add" data-type="webcam" title="Додати Webcam модель">+</button>
+      </div>
+      <div class="section-content" id="webcamContent">
+        <div class="cards-grid" id="webcamGrid"></div>
+        <div class="empty-state" id="webcamEmpty">Порожньо. Додай першу.</div>
+      </div>
+    </section>
+
+    <!-- SECTION: CELEBRITIES -->
+    <section class="section collapsed" id="section-celebrities">
+      <div class="section-header" data-section="celebrities">
+        <span class="section-toggle">▼</span>
+        <h2>⭐ Знаменитості</h2>
+        <span class="count" id="celebritiesCount">0</span>
+        <button class="btn-add" data-type="celebrities" title="Додати знаменитість">+</button>
+      </div>
+      <div class="section-content" id="celebritiesContent">
+        <div class="cards-grid" id="celebritiesGrid"></div>
+        <div class="empty-state" id="celebritiesEmpty">Порожньо. Додай першу.</div>
+      </div>
+    </section>
+
+    <!-- SECTION: PEOPLE / EXES -->
+    <section class="section collapsed" id="section-people">
+      <div class="section-header" data-section="people">
+        <span class="section-toggle">▼</span>
+        <h2>👤 Знайомі / Колишні</h2>
+        <span class="count" id="peopleCount">0</span>
+        <button class="btn-add" data-type="people" title="Додати людину">+</button>
+      </div>
+      <div class="section-content" id="peopleContent">
+        <div class="cards-grid" id="peopleGrid"></div>
+        <div class="empty-state" id="peopleEmpty">Порожньо. Додай першу.</div>
+      </div>
+    </section>
+
+    <!-- SECTION: VIDEOS -->
+    <section class="section collapsed" id="section-videos">
+      <div class="section-header" data-section="videos">
+        <span class="section-toggle">▼</span>
+        <h2>🎬 Відео</h2>
+        <span class="count" id="videosCount">0</span>
+        <button class="btn-add" data-type="videos" title="Додати відео">+</button>
+      </div>
+      <div class="section-content" id="videosContent">
+        <div class="cards-grid" id="videosGrid"></div>
+        <div class="empty-state" id="videosEmpty">Порожньо. Додай перше.</div>
+      </div>
+    </section>
+
+    <!-- SECTION: GAMES -->
+    <section class="section collapsed" id="section-games">
+      <div class="section-header" data-section="games">
+        <span class="section-toggle">▼</span>
+        <h2>🎮 Ігри</h2>
+        <span class="count" id="gamesCount">0</span>
+        <button class="btn-add" data-type="games" title="Додати гру">+</button>
+      </div>
+      <div class="section-content" id="gamesContent">
+        <div class="cards-grid" id="gamesGrid"></div>
+        <div class="empty-state" id="gamesEmpty">Порожньо. Додай першу.</div>
+      </div>
+    </section>
+
+    <!-- SECTION: HENTAI -->
+    <section class="section collapsed" id="section-hentai">
+      <div class="section-header" data-section="hentai">
+        <span class="section-toggle">▼</span>
+        <h2>🌸 Хентай</h2>
+        <span class="count" id="hentaiCount">0</span>
+        <button class="btn-add" data-type="hentai" title="Додати хентай">+</button>
+      </div>
+      <div class="section-content" id="hentaiContent">
+        <div class="cards-grid" id="hentaiGrid"></div>
+        <div class="empty-state" id="hentaiEmpty">Порожньо. Додай першу.</div>
+      </div>
+    </section>
+
+    <!-- SECTION: COMICS -->
+    <section class="section collapsed" id="section-comics">
+      <div class="section-header" data-section="comics">
+        <span class="section-toggle">▼</span>
+        <h2>📚 Комікси</h2>
+        <span class="count" id="comicsCount">0</span>
+        <button class="btn-add" data-type="comics" title="Додати комікс">+</button>
+      </div>
+      <div class="section-content" id="comicsContent">
+        <div class="cards-grid" id="comicsGrid"></div>
+        <div class="empty-state" id="comicsEmpty">Порожньо. Додай перший.</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- MODAL: Add / Edit -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-content modal-content-scroll">
+      <div class="modal-header">
+        <h3 id="modalTitle">Додати профіль</h3>
+        <button id="modalClose" class="icon-btn">✕</button>
+      </div>
+      <form id="profileForm">
+        <input type="hidden" id="profileId">
+        <input type="hidden" id="profileType">
+
+<div class="form-group">
+          <label>Превʼю</label>
+          <div class="photo-upload">
+            <img id="photoPreview" src="" alt="" class="hidden">
+            <input type="file" id="photoInput" accept="image/*">
+            <div class="photo-url-row" style="display:flex; gap:6px; margin-top:6px;">
+              <input type="url" id="photoUrl" placeholder="або встав URL фото https://...">
+              <button type="button" id="btnLoadPhotoUrl" class="btn-secondary">Завантажити</button>
+            </div>
+            <button type="button" id="btnClearPhoto" class="btn-secondary hidden" style="margin-top:6px;">Очистити фото</button>
+          </div>
+        </div>
+
+<div class="form-group">
+          <label for="name" id="nameLabel">Ім'я / Нік *</label>
+          <input type="text" id="name" required placeholder="Наприклад: Sofia / @sofiamodel">
+        </div>
+<div class="form-group">
+          <label for="rating">Оцінка</label>
+          <div class="rating-row" style="display:flex; align-items:center; gap:10px;">
+            <input type="range" id="rating" min="0" max="10" step="1" value="0" style="flex:1;">
+            <span id="ratingValue" class="rating-badge">—</span>
+          </div>
+        </div>
+
+<div id="desireBlock" class="form-group hidden">
+          <label for="desire">Хочеться</label>
+          <div class="rating-row" style="display:flex; align-items:center; gap:10px;">
+            <input type="range" id="desire" min="0" max="10" step="1" value="0" style="flex:1;">
+            <span id="desireValue" class="rating-badge">—</span>
+          </div>
+        </div>
+
+<div id="detailRatingsBlock" class="detail-ratings-block">
+          <button type="button" id="btnToggleDetails" class="btn-toggle-details">
+            <span class="toggle-arrow">▶</span> Тіло
+          </button>
+          <div id="detailRatingsContent" class="detail-ratings-content hidden">
+            <div class="detail-rating-row">
+              <label>Обличчя</label>
+              <input type="range" class="detail-rating" data-key="face" min="0" max="10" value="0">
+              <span class="detail-val">—</span>
+            </div>
+            <div class="detail-rating-row">
+              <label>Груди</label>
+              <input type="range" class="detail-rating" data-key="breasts" min="0" max="10" value="0">
+              <span class="detail-val">—</span>
+            </div>
+            <div class="detail-rating-row">
+              <label>Попа</label>
+              <input type="range" class="detail-rating" data-key="ass" min="0" max="10" value="0">
+              <span class="detail-val">—</span>
+            </div>
+            <div class="detail-rating-row">
+              <label>Кіска</label>
+              <input type="range" class="detail-rating" data-key="pussy" min="0" max="10" value="0">
+              <span class="detail-val">—</span>
+            </div>
+            <div class="detail-rating-row">
+              <label>Ноги</label>
+              <input type="range" class="detail-rating" data-key="legs" min="0" max="10" value="0">
+              <span class="detail-val">—</span>
+            </div>
+            <div class="detail-rating-row">
+              <label>Тіло</label>
+              <input type="range" class="detail-rating" data-key="bodyScore" min="0" max="10" value="0">
+              <span class="detail-val">—</span>
+            </div>
+          </div>
+        </div>
+
+<div id="bodyPhotosBlock" class="detail-ratings-block hidden">
+          <button type="button" id="btnToggleBodyPhotos" class="btn-toggle-details">
+            <span class="toggle-arrow">▶</span> Фото тіла
+          </button>
+          <div id="bodyPhotosContent" class="detail-ratings-content hidden">
+            <div class="body-photo-slots" id="bodyPhotoSlots">
+              <!-- filled by JS or static -->
+              <div class="body-slot" data-slot="face">
+                <div class="body-slot-label">Обличчя</div>
+                <img class="body-slot-img hidden" alt="">
+                <div class="body-slot-actions">
+                  <label class="btn-secondary body-slot-file-btn">Файл<input type="file" accept="image/*" class="body-slot-file hidden-input"></label>
+                  <button type="button" class="btn-secondary body-slot-url-btn">URL</button>
+                  <button type="button" class="btn-secondary body-slot-clear hidden">✕</button>
+                </div>
+              </div>
+              <div class="body-slot" data-slot="breasts">
+                <div class="body-slot-label">Груди</div>
+                <img class="body-slot-img hidden" alt="">
+                <div class="body-slot-actions">
+                  <label class="btn-secondary body-slot-file-btn">Файл<input type="file" accept="image/*" class="body-slot-file hidden-input"></label>
+                  <button type="button" class="btn-secondary body-slot-url-btn">URL</button>
+                  <button type="button" class="btn-secondary body-slot-clear hidden">✕</button>
+                </div>
+              </div>
+              <div class="body-slot" data-slot="ass">
+                <div class="body-slot-label">Попа</div>
+                <img class="body-slot-img hidden" alt="">
+                <div class="body-slot-actions">
+                  <label class="btn-secondary body-slot-file-btn">Файл<input type="file" accept="image/*" class="body-slot-file hidden-input"></label>
+                  <button type="button" class="btn-secondary body-slot-url-btn">URL</button>
+                  <button type="button" class="btn-secondary body-slot-clear hidden">✕</button>
+                </div>
+              </div>
+              <div class="body-slot" data-slot="pussy">
+                <div class="body-slot-label">Кіска</div>
+                <img class="body-slot-img hidden" alt="">
+                <div class="body-slot-actions">
+                  <label class="btn-secondary body-slot-file-btn">Файл<input type="file" accept="image/*" class="body-slot-file hidden-input"></label>
+                  <button type="button" class="btn-secondary body-slot-url-btn">URL</button>
+                  <button type="button" class="btn-secondary body-slot-clear hidden">✕</button>
+                </div>
+              </div>
+              <div class="body-slot" data-slot="legs">
+                <div class="body-slot-label">Ноги</div>
+                <img class="body-slot-img hidden" alt="">
+                <div class="body-slot-actions">
+                  <label class="btn-secondary body-slot-file-btn">Файл<input type="file" accept="image/*" class="body-slot-file hidden-input"></label>
+                  <button type="button" class="btn-secondary body-slot-url-btn">URL</button>
+                  <button type="button" class="btn-secondary body-slot-clear hidden">✕</button>
+                </div>
+              </div>
+              <div class="body-slot" data-slot="full">
+                <div class="body-slot-label">Тіло / повний</div>
+                <img class="body-slot-img hidden" alt="">
+                <div class="body-slot-actions">
+                  <label class="btn-secondary body-slot-file-btn">Файл<input type="file" accept="image/*" class="body-slot-file hidden-input"></label>
+                  <button type="button" class="btn-secondary body-slot-url-btn">URL</button>
+                  <button type="button" class="btn-secondary body-slot-clear hidden">✕</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+<div id="sexSkillsBlock" class="detail-ratings-block hidden">
+          <button type="button" id="btnToggleSkills" class="btn-toggle-details">
+            <span class="toggle-arrow">▶</span> Скіли
+          </button>
+          <div id="sexSkillsContent" class="detail-ratings-content hidden">
+            <div class="detail-rating-row">
+              <label>Мінет</label>
+              <input type="range" class="skill-rating" data-key="blowjob" min="0" max="10" value="0">
+              <span class="detail-val">—</span>
+            </div>
+            <div class="detail-rating-row">
+              <label>Анал</label>
+              <input type="range" class="skill-rating" data-key="anal" min="0" max="10" value="0">
+              <span class="detail-val">—</span>
+            </div>
+            <div class="detail-rating-row">
+              <label>Верхом</label>
+              <input type="range" class="skill-rating" data-key="riding" min="0" max="10" value="0">
+              <span class="detail-val">—</span>
+            </div>
+            <div class="detail-rating-row">
+              <label>Dirty talk</label>
+              <input type="range" class="skill-rating" data-key="dirtyTalk" min="0" max="10" value="0">
+              <span class="detail-val">—</span>
+            </div>
+            <div class="detail-rating-row">
+              <label>Послух</label>
+              <input type="range" class="skill-rating" data-key="submission" min="0" max="10" value="0">
+              <span class="detail-val">—</span>
+            </div>
+            <div class="detail-rating-row">
+              <label>Домінація</label>
+              <input type="range" class="skill-rating" data-key="domination" min="0" max="10" value="0">
+              <span class="detail-val">—</span>
+            </div>
+          </div>
+        </div>
+
+<div id="peopleFields" class="people-only hidden">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="age">Вік</label>
+              <input type="text" id="age" placeholder="25">
+            </div>
+            <div class="form-group">
+              <label for="phone">Телефон</label>
+              <input type="text" id="phone" placeholder="+380...">
+            </div>
+          </div>
+
+        </div>
+
+
+
+<!-- Desire: models / OF / webcam / people -->
+        
+
+<!-- Detailed body ratings (hidden for videos) -->
+        
+
+<!-- Body part photos: models / OF / webcam / people -->
+
+<!-- Sex skills: models / OF / webcam only -->
+        
+
+
+
+
+
+        <!-- Fields only for PEOPLE -->
+        
+
+<div class="form-group">
+          <label for="description">Нотатки</label>
+          <textarea id="description" rows="3" placeholder="Що важливо знати…"></textarea>
+        </div>
+
+<div class="form-group">
+          <label>Посилання</label>
+          <div id="linksContainer"></div>
+          <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+            <button type="button" id="btnAddLink" class="btn-secondary">+ Додати посилання</button>
+            <button type="button" id="btnOpenAll" class="btn-secondary">Відкрити всі ↗</button>
+          </div>
+        </div>
+
+        <div class="modal-actions modal-actions-sticky">
+          <button type="button" id="btnDelete" class="btn-danger hidden">Видалити</button>
+          <button type="submit" class="btn-primary">Зберегти</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Hidden file input for import -->
+  <input type="file" id="importFile" accept=".json" class="hidden">
+
+  <script src="js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(function(){});
+    }
+  </script>
+</body>
+</html>
