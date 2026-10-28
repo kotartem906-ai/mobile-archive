@@ -30,17 +30,62 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
 }
 
+// ===== IndexedDB (великий ліміт; localStorage ~5МБ замалий для фото) =====
+var DB_NAME = 'intimate-archive';
+var DB_STORE = 'kv';
+var dbPromise = null;
+
+function openDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise(function(resolve, reject) {
+    var req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = function() {
+      var db = req.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) {
+        db.createObjectStore(DB_STORE);
+      }
+    };
+    req.onsuccess = function() { resolve(req.result); };
+    req.onerror = function() { reject(req.error); };
+  });
+  return dbPromise;
+}
+
+function idbSet(key, value) {
+  return openDb().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction(DB_STORE, 'readwrite');
+      tx.objectStore(DB_STORE).put(value, key);
+      tx.oncomplete = function() { resolve(true); };
+      tx.onerror = function() { reject(tx.error); };
+    });
+  });
+}
+
+function idbGet(key) {
+  return openDb().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction(DB_STORE, 'readonly');
+      var req = tx.objectStore(DB_STORE).get(key);
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror = function() { reject(req.error); };
+    });
+  });
+}
+
 async function saveData() {
   try {
-    localStorage.setItem('profilesData', JSON.stringify(data));
+    await idbSet('profilesData', data);
+    // міграція: прибрати старий localStorage, щоб не займав місце
+    try { localStorage.removeItem('profilesData'); } catch (e) {}
     return true;
   } catch (err) {
     console.error('Save error:', err);
-    var msg = (err.message || '').toLowerCase();
+    var msg = (err && err.message || '').toLowerCase();
     if (msg.indexOf('quota') !== -1 || msg.indexOf('storage') !== -1) {
-      alert('Не вистачає місця.\nЗроби експорт і видали зайві фото.');
+      alert('Не вистачає місця навіть у великому сховищі.\\nВидали зайві фото частин тіла або зроби експорт і почисти.');
     } else {
-      alert('Помилка збереження: ' + (err.message || err));
+      alert('Помилка збереження: ' + (err && err.message || err));
     }
     return false;
   }
@@ -48,9 +93,25 @@ async function saveData() {
 
 async function loadData() {
   try {
-    var raw = localStorage.getItem('profilesData');
-    if (raw) data = JSON.parse(raw);
-  } catch (e) { console.error(e); }
+    var fromIdb = await idbGet('profilesData');
+    if (fromIdb && typeof fromIdb === 'object') {
+      data = fromIdb;
+    } else {
+      // міграція зі старого localStorage
+      var raw = localStorage.getItem('profilesData');
+      if (raw) {
+        data = JSON.parse(raw);
+        await idbSet('profilesData', data);
+        try { localStorage.removeItem('profilesData'); } catch (e) {}
+      }
+    }
+  } catch (e) {
+    console.error(e);
+    try {
+      var raw2 = localStorage.getItem('profilesData');
+      if (raw2) data = JSON.parse(raw2);
+    } catch (e2) {}
+  }
   SECTION_TYPES.forEach(function(t) {
     if (!Array.isArray(data[t])) data[t] = [];
   });
@@ -115,12 +176,13 @@ function compressBodyPart(dataUrl) {
 
 async function updateStorageInfo() {
   try {
-    var raw = localStorage.getItem('profilesData') || '';
-    var mb = (raw.length * 2 / (1024 * 1024)).toFixed(2);
+    var approx = 0;
+    try { approx = JSON.stringify(data).length * 2; } catch (e) {}
+    var mb = (approx / (1024 * 1024)).toFixed(2);
     var el = document.getElementById('storageInfo');
     if (el) {
       el.textContent = mb + ' МБ';
-      el.title = 'Приблизний розмір даних: ' + mb + ' МБ';
+      el.title = 'Приблизний розмір даних: ' + mb + ' МБ (IndexedDB)';
     }
   } catch (e) {}
 }
