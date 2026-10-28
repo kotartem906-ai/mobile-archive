@@ -73,36 +73,94 @@ function idbGet(key) {
   });
 }
 
+async function shrinkItemPhotos(item, hard) {
+  if (!item || typeof item !== 'object') return item;
+  hard = !!hard;
+  var maxMain = hard ? 220 : 320;
+  var qMain = hard ? 0.55 : 0.65;
+  if (item.photo && typeof item.photo === 'string' && item.photo.indexOf('data:') === 0) {
+    try { item.photo = await compressImage(item.photo, maxMain, qMain); } catch (e) {}
+  }
+  if (item.bodyPhotos && typeof item.bodyPhotos === 'object') {
+    if (hard) {
+      item.bodyPhotos = {};
+    } else {
+      var keys = Object.keys(item.bodyPhotos);
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        var src = item.bodyPhotos[k];
+        if (src && typeof src === 'string' && src.indexOf('data:') === 0) {
+          try { item.bodyPhotos[k] = await compressImage(src, 180, 0.5); } catch (e) {}
+        }
+      }
+    }
+  }
+  return item;
+}
+
+async function shrinkAllData(hard) {
+  for (var t = 0; t < SECTION_TYPES.length; t++) {
+    var list = data[SECTION_TYPES[t]] || [];
+    for (var i = 0; i < list.length; i++) {
+      list[i] = await shrinkItemPhotos(list[i], hard);
+    }
+  }
+}
+
+async function saveDataSplit() {
+  for (var i = 0; i < SECTION_TYPES.length; i++) {
+    await idbSet('sec_' + SECTION_TYPES[i], data[SECTION_TYPES[i]] || []);
+  }
+  await idbSet('profilesMeta', { v: 2, at: Date.now() });
+  try { localStorage.removeItem('profilesData'); } catch (e) {}
+}
+
 async function saveData() {
   try {
-    await idbSet('profilesData', data);
-    // міграція: прибрати старий localStorage, щоб не займав місце
-    try { localStorage.removeItem('profilesData'); } catch (e) {}
+    await saveDataSplit();
+    try { await idbSet('profilesData', null); } catch (e) {}
     return true;
   } catch (err) {
-    console.error('Save error:', err);
-    var msg = (err && err.message || '').toLowerCase();
-    if (msg.indexOf('quota') !== -1 || msg.indexOf('storage') !== -1) {
-      alert('Не вистачає місця навіть у великому сховищі.\\nВидали зайві фото частин тіла або зроби експорт і почисти.');
-    } else {
-      alert('Помилка збереження: ' + (err && err.message || err));
+    console.error('Save error, try shrink...', err);
+    try {
+      await shrinkAllData(false);
+      await saveDataSplit();
+      return true;
+    } catch (err2) {
+      try {
+        await shrinkAllData(true);
+        await saveDataSplit();
+        alert('Збережено зі стисненням: фото зменшено, фото частин тіла прибрано.');
+        return true;
+      } catch (err3) {
+        console.error(err3);
+        alert('Не вдалося зберегти. Замало місця на телефоні або файл занадто великий.');
+        return false;
+      }
     }
-    return false;
   }
 }
 
 async function loadData() {
   try {
-    var fromIdb = await idbGet('profilesData');
-    if (fromIdb && typeof fromIdb === 'object') {
-      data = fromIdb;
+    var meta = await idbGet('profilesMeta');
+    if (meta && meta.v === 2) {
+      for (var i = 0; i < SECTION_TYPES.length; i++) {
+        var sec = await idbGet('sec_' + SECTION_TYPES[i]);
+        data[SECTION_TYPES[i]] = Array.isArray(sec) ? sec : [];
+      }
     } else {
-      // міграція зі старого localStorage
-      var raw = localStorage.getItem('profilesData');
-      if (raw) {
-        data = JSON.parse(raw);
-        await idbSet('profilesData', data);
-        try { localStorage.removeItem('profilesData'); } catch (e) {}
+      var fromIdb = await idbGet('profilesData');
+      if (fromIdb && typeof fromIdb === 'object' && !Array.isArray(fromIdb)) {
+        data = fromIdb;
+        try { await saveDataSplit(); } catch (e) {}
+      } else {
+        var raw = localStorage.getItem('profilesData');
+        if (raw) {
+          data = JSON.parse(raw);
+          try { await saveDataSplit(); } catch (e) {}
+          try { localStorage.removeItem('profilesData'); } catch (e) {}
+        }
       }
     }
   } catch (e) {
@@ -1063,28 +1121,50 @@ document.getElementById('importFile').addEventListener('change', function(e) {
   reader.onload = async function(ev) {
     try {
       var imported = JSON.parse(ev.target.result);
-      if (imported.models || imported.people || imported.onlyfans || imported.webcam || imported.celebrities || imported.videos || imported.games || imported.hentai || imported.comics) {
-        if (confirm('Замінити всі поточні дані імпортованими?')) {
-          data = {
-            models:       imported.models       || [],
-            onlyfans:     imported.onlyfans     || [],
-            webcam:       imported.webcam       || [],
-            celebrities:  imported.celebrities  || [],
-            people:       imported.people       || [],
-            videos:       imported.videos       || [],
-            games:        imported.games        || [],
-            hentai:       imported.hentai       || [],
-            comics:       imported.comics       || []
-          };
-          var ok = await saveData();
-          if (ok) { render(); alert('Імпортовано успішно!'); }
-        }
-      } else {
+      if (!(imported.models || imported.people || imported.onlyfans || imported.webcam || imported.celebrities || imported.videos || imported.games || imported.hentai || imported.comics)) {
         alert('Невірний формат файлу');
+        return;
+      }
+      if (!confirm('Замінити всі поточні дані імпортованими?')) return;
+
+      // На телефоні за замовчуванням легший імпорт
+      var light = true;
+      if (confirm('Легкий імпорт для телефону?\n\nOK = без фото частин тіла + сильне стиснення превʼю (рекомендовано)\nСкасувати = повний імпорт (може не влізти)')) {
+        light = true;
+      } else {
+        light = false;
+      }
+
+      data = {
+        models:       imported.models       || [],
+        onlyfans:     imported.onlyfans     || [],
+        webcam:       imported.webcam       || [],
+        celebrities:  imported.celebrities  || [],
+        people:       imported.people       || [],
+        videos:       imported.videos       || [],
+        games:        imported.games        || [],
+        hentai:       imported.hentai       || [],
+        comics:       imported.comics       || []
+      };
+
+      // стискаємо / чистимо фото перед збереженням
+      await shrinkAllData(light);
+
+      var ok = await saveData();
+      if (ok) {
+        render();
+        updateStorageInfo();
+        alert(light
+          ? 'Імпортовано (легкий режим). Картки на місці, зайві великі фото обрізано.'
+          : 'Імпортовано повністю.');
       }
     } catch (err) {
-      alert('Помилка читання файлу');
+      console.error(err);
+      alert('Помилка імпорту: ' + (err && err.message || err));
     }
+  };
+  reader.onerror = function() {
+    alert('Не вдалося прочитати файл');
   };
   reader.readAsText(file);
   e.target.value = '';
