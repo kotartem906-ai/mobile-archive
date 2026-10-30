@@ -30,170 +30,125 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
 }
 
-// ===== IndexedDB (великий ліміт; localStorage ~5МБ замалий для фото) =====
-var DB_NAME = 'intimate-archive';
+
+// ===== IndexedDB storage (mobile) =====
+var DB_NAME = 'notes-v5';
 var DB_STORE = 'kv';
-var dbPromise = null;
+var _dbp = null;
 
 function openDb() {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise(function(resolve, reject) {
-    var req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = function() {
-      var db = req.result;
-      if (!db.objectStoreNames.contains(DB_STORE)) {
-        db.createObjectStore(DB_STORE);
-      }
+  if (_dbp) return _dbp;
+  _dbp = new Promise(function(resolve, reject) {
+    var r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = function() {
+      if (!r.result.objectStoreNames.contains(DB_STORE)) r.result.createObjectStore(DB_STORE);
     };
-    req.onsuccess = function() { resolve(req.result); };
-    req.onerror = function() { reject(req.error); };
+    r.onsuccess = function() { resolve(r.result); };
+    r.onerror = function() { reject(r.error); };
   });
-  return dbPromise;
+  return _dbp;
 }
-
-function idbSet(key, value) {
+function idbPut(key, val) {
   return openDb().then(function(db) {
-    return new Promise(function(resolve, reject) {
+    return new Promise(function(res, rej) {
       var tx = db.transaction(DB_STORE, 'readwrite');
-      tx.objectStore(DB_STORE).put(value, key);
-      tx.oncomplete = function() { resolve(true); };
-      tx.onerror = function() { reject(tx.error); };
+      tx.oncomplete = function() { res(); };
+      tx.onerror = function() { rej(tx.error); };
+      tx.objectStore(DB_STORE).put(val, key);
     });
   });
 }
-
 function idbGet(key) {
   return openDb().then(function(db) {
-    return new Promise(function(resolve, reject) {
-      var tx = db.transaction(DB_STORE, 'readonly');
-      var req = tx.objectStore(DB_STORE).get(key);
-      req.onsuccess = function() { resolve(req.result); };
-      req.onerror = function() { reject(req.error); };
+    return new Promise(function(res, rej) {
+      var req = db.transaction(DB_STORE, 'readonly').objectStore(DB_STORE).get(key);
+      req.onsuccess = function() { res(req.result); };
+      req.onerror = function() { rej(req.error); };
     });
   });
-}
-
-async function shrinkItemPhotos(item, hard) {
-  if (!item || typeof item !== 'object') return item;
-  hard = !!hard;
-  var maxMain = hard ? 220 : 320;
-  var qMain = hard ? 0.55 : 0.65;
-  if (item.photo && typeof item.photo === 'string' && item.photo.indexOf('data:') === 0) {
-    try { item.photo = await compressImage(item.photo, maxMain, qMain); } catch (e) {}
-  }
-  if (item.bodyPhotos && typeof item.bodyPhotos === 'object') {
-    if (hard) {
-      item.bodyPhotos = {};
-    } else {
-      var keys = Object.keys(item.bodyPhotos);
-      for (var i = 0; i < keys.length; i++) {
-        var k = keys[i];
-        var src = item.bodyPhotos[k];
-        if (src && typeof src === 'string' && src.indexOf('data:') === 0) {
-          try { item.bodyPhotos[k] = await compressImage(src, 180, 0.5); } catch (e) {}
-        }
-      }
-    }
-  }
-  return item;
-}
-
-async function shrinkAllData(hard) {
-  for (var t = 0; t < SECTION_TYPES.length; t++) {
-    var list = data[SECTION_TYPES[t]] || [];
-    for (var i = 0; i < list.length; i++) {
-      list[i] = await shrinkItemPhotos(list[i], hard);
-    }
-  }
-}
-
-async function saveDataSplit() {
-  for (var i = 0; i < SECTION_TYPES.length; i++) {
-    await idbSet('sec_' + SECTION_TYPES[i], data[SECTION_TYPES[i]] || []);
-  }
-  await idbSet('profilesMeta', { v: 2, at: Date.now() });
-  try { localStorage.removeItem('profilesData'); } catch (e) {}
 }
 
 async function saveData() {
   try {
-    await saveDataSplit();
-    try { await idbSet('profilesData', null); } catch (e) {}
+    if (navigator.storage && navigator.storage.persist) {
+      try { await navigator.storage.persist(); } catch (e) {}
+    }
+    for (var i = 0; i < SECTION_TYPES.length; i++) {
+      await idbPut('s:' + SECTION_TYPES[i], data[SECTION_TYPES[i]] || []);
+    }
+    await idbPut('meta', { v: 5, t: Date.now() });
+    try { localStorage.removeItem('profilesData'); } catch (e) {}
     return true;
   } catch (err) {
-    console.error('Save error, try shrink...', err);
-    try {
-      await shrinkAllData(false);
-      await saveDataSplit();
-      return true;
-    } catch (err2) {
-      try {
-        await shrinkAllData(true);
-        await saveDataSplit();
-        alert('Збережено зі стисненням: фото зменшено, фото частин тіла прибрано.');
-        return true;
-      } catch (err3) {
-        console.error(err3);
-        alert('Не вдалося зберегти. Замало місця на телефоні або файл занадто великий.');
-        return false;
-      }
-    }
+    console.error(err);
+    alert('Помилка збереження: ' + (err && err.message || err));
+    return false;
   }
 }
 
 async function loadData() {
   try {
-    var meta = await idbGet('profilesMeta');
-    if (meta && meta.v === 2) {
+    var meta = await idbGet('meta');
+    if (meta && meta.v === 5) {
       for (var i = 0; i < SECTION_TYPES.length; i++) {
-        var sec = await idbGet('sec_' + SECTION_TYPES[i]);
-        data[SECTION_TYPES[i]] = Array.isArray(sec) ? sec : [];
+        var t = SECTION_TYPES[i];
+        var sec = await idbGet('s:' + t);
+        data[t] = Array.isArray(sec) ? sec : [];
       }
     } else {
-      var fromIdb = await idbGet('profilesData');
-      if (fromIdb && typeof fromIdb === 'object' && !Array.isArray(fromIdb)) {
-        data = fromIdb;
-        try { await saveDataSplit(); } catch (e) {}
-      } else {
-        var raw = localStorage.getItem('profilesData');
-        if (raw) {
-          data = JSON.parse(raw);
-          try { await saveDataSplit(); } catch (e) {}
-          try { localStorage.removeItem('profilesData'); } catch (e) {}
-        }
+      var raw = localStorage.getItem('profilesData');
+      if (raw) {
+        data = JSON.parse(raw);
+        await saveData();
+        try { localStorage.removeItem('profilesData'); } catch (e) {}
       }
     }
-  } catch (e) {
-    console.error(e);
-    try {
-      var raw2 = localStorage.getItem('profilesData');
-      if (raw2) data = JSON.parse(raw2);
-    } catch (e2) {}
-  }
+  } catch (e) { console.error(e); }
+
   SECTION_TYPES.forEach(function(t) {
     if (!Array.isArray(data[t])) data[t] = [];
   });
+
   try {
-    var ui = localStorage.getItem('uiSettings');
-    if (ui) {
-      var parsed = JSON.parse(ui);
-      if (parsed.sort) currentSort = parsed.sort;
-      if (parsed.theme) currentTheme = parsed.theme;
-      if (parsed.coverTitle) {
-        var tEl = document.getElementById('appTitle');
-        if (tEl) tEl.firstChild.textContent = parsed.coverTitle + ' ';
-        document.title = parsed.coverTitle;
-      }
+    var ui = JSON.parse(localStorage.getItem('uiSettings') || '{}');
+    if (ui.sort) currentSort = ui.sort;
+    if (ui.theme) currentTheme = ui.theme;
+    if (ui.coverTitle) {
+      var el = document.getElementById('appTitle');
+      if (el) el.firstChild.textContent = ui.coverTitle + ' ';
+      document.title = ui.coverTitle;
     }
   } catch (e) {}
+
   applyTheme(currentTheme);
   if (typeof updateMenuActiveStates === 'function') updateMenuActiveStates();
-  document.querySelectorAll('.section').forEach(function(s) {
-    s.classList.add('collapsed');
-  });
+  document.querySelectorAll('.section').forEach(function(s) { s.classList.add('collapsed'); });
   render();
   updateStorageInfo();
 }
+
+async function updateStorageInfo() {
+  var el = document.getElementById('storageInfo');
+  if (!el) return;
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      var est = await navigator.storage.estimate();
+      el.textContent = ((est.usage || 0) / 1048576).toFixed(1) + ' МБ';
+      el.title = 'Дані в браузері';
+    }
+  } catch (e) {}
+}
+
+async function saveUiSettings() {
+  try {
+    var prev = {};
+    try { prev = JSON.parse(localStorage.getItem('uiSettings') || '{}'); } catch (e) {}
+    prev.sort = currentSort;
+    prev.theme = currentTheme;
+    localStorage.setItem('uiSettings', JSON.stringify(prev));
+  } catch (e) {}
+}
+
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -232,18 +187,6 @@ function compressBodyPart(dataUrl) {
   return compressImage(dataUrl, 280, 0.62);
 }
 
-async function updateStorageInfo() {
-  try {
-    var approx = 0;
-    try { approx = JSON.stringify(data).length * 2; } catch (e) {}
-    var mb = (approx / (1024 * 1024)).toFixed(2);
-    var el = document.getElementById('storageInfo');
-    if (el) {
-      el.textContent = mb + ' МБ';
-      el.title = 'Приблизний розмір даних: ' + mb + ' МБ (IndexedDB)';
-    }
-  } catch (e) {}
-}
 
 function isPeopleType(type) { return type === 'people'; }
 function isSimpleType(type) { return SIMPLE_TYPES.indexOf(type) !== -1; }
@@ -284,17 +227,6 @@ function applyTheme(theme) {
     currentTheme === 'pulse' || currentTheme === 'glow' || currentTheme === 'neon' || currentTheme === 'heat');
 }
 
-async function saveUiSettings() {
-  try {
-    var prev = {};
-    try { prev = JSON.parse(localStorage.getItem('uiSettings') || '{}'); } catch (e) {}
-    prev.sort = currentSort;
-    prev.theme = currentTheme;
-    localStorage.setItem('uiSettings', JSON.stringify(prev));
-  } catch (e) {
-    console.error(e);
-  }
-}
 
 function sortItems(items) {
   var list = items.slice();
@@ -1117,6 +1049,11 @@ document.getElementById('btnImport').addEventListener('click', function() {
 document.getElementById('importFile').addEventListener('change', function(e) {
   var file = e.target.files[0];
   if (!file) return;
+  var mb = (file.size / 1048576).toFixed(1);
+  if (!confirm('Імпортувати «' + file.name + '» (' + mb + ' МБ)? Поточні дані буде замінено.')) {
+    e.target.value = '';
+    return;
+  }
   var reader = new FileReader();
   reader.onload = async function(ev) {
     try {
@@ -1125,47 +1062,32 @@ document.getElementById('importFile').addEventListener('change', function(e) {
         alert('Невірний формат файлу');
         return;
       }
-      if (!confirm('Замінити всі поточні дані імпортованими?')) return;
-
-      // На телефоні за замовчуванням легший імпорт
-      var light = true;
-      if (confirm('Легкий імпорт для телефону?\n\nOK = без фото частин тіла + сильне стиснення превʼю (рекомендовано)\nСкасувати = повний імпорт (може не влізти)')) {
-        light = true;
-      } else {
-        light = false;
-      }
-
       data = {
-        models:       imported.models       || [],
-        onlyfans:     imported.onlyfans     || [],
-        webcam:       imported.webcam       || [],
-        celebrities:  imported.celebrities  || [],
-        people:       imported.people       || [],
-        videos:       imported.videos       || [],
-        games:        imported.games        || [],
-        hentai:       imported.hentai       || [],
-        comics:       imported.comics       || []
+        models: imported.models || [],
+        onlyfans: imported.onlyfans || [],
+        webcam: imported.webcam || [],
+        celebrities: imported.celebrities || [],
+        people: imported.people || [],
+        videos: imported.videos || [],
+        games: imported.games || [],
+        hentai: imported.hentai || [],
+        comics: imported.comics || []
       };
-
-      // стискаємо / чистимо фото перед збереженням
-      await shrinkAllData(light);
-
+      SECTION_TYPES.forEach(function(t) { if (!Array.isArray(data[t])) data[t] = []; });
       var ok = await saveData();
       if (ok) {
         render();
-        updateStorageInfo();
-        alert(light
-          ? 'Імпортовано (легкий режим). Картки на місці, зайві великі фото обрізано.'
-          : 'Імпортовано повністю.');
+        await updateStorageInfo();
+        var n = 0;
+        SECTION_TYPES.forEach(function(t) { n += (data[t] || []).length; });
+        alert('Імпорт успішний. Карток: ' + n);
       }
     } catch (err) {
       console.error(err);
       alert('Помилка імпорту: ' + (err && err.message || err));
     }
   };
-  reader.onerror = function() {
-    alert('Не вдалося прочитати файл');
-  };
+  reader.onerror = function() { alert('Не вдалося прочитати файл'); };
   reader.readAsText(file);
   e.target.value = '';
 });
@@ -1231,14 +1153,14 @@ var coverInput = document.getElementById('coverTitleInput');
 var btnSaveCover = document.getElementById('btnSaveCover');
 if (coverInput) {
   try {
-    var ui0 = JSON.parse(localStorage.getItem('uiSettings') || '{}');
-    if (ui0.coverTitle) coverInput.value = ui0.coverTitle;
+    var uix = JSON.parse(localStorage.getItem('uiSettings') || '{}');
+    if (uix.coverTitle) coverInput.value = uix.coverTitle;
   } catch (e) {}
 }
 if (btnSaveCover) {
   btnSaveCover.addEventListener('click', function(e) {
     e.stopPropagation();
-    var title = (coverInput && coverInput.value || '').trim() || 'Нотатки';
+    var title = ((coverInput && coverInput.value) || '').trim() || 'Нотатки';
     try {
       var prev = JSON.parse(localStorage.getItem('uiSettings') || '{}');
       prev.coverTitle = title;
@@ -1246,20 +1168,12 @@ if (btnSaveCover) {
     } catch (err) {}
     var tEl = document.getElementById('appTitle');
     if (tEl) {
-      // keep storageInfo span
       var info = document.getElementById('storageInfo');
-      tEl.innerHTML = '';
+      tEl.textContent = '';
       tEl.appendChild(document.createTextNode(title + ' '));
       if (info) tEl.appendChild(info);
-      else {
-        var sp = document.createElement('span');
-        sp.id = 'storageInfo';
-        sp.className = 'storage-info';
-        tEl.appendChild(sp);
-      }
     }
     document.title = title;
-    alert('Назву збережено: ' + title);
   });
 }
 
